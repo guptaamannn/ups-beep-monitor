@@ -18,32 +18,32 @@ Already done: `upsbeep-core` has `Config`, `goertzel::tone_ratio`, and the `Dete
 
 ## Milestones
 
-### 1. Config file loading
+### 1. Config file loading (done)
 - Add `Config::load(path)` and `default_path()` (cfg-gated per OS).
 - Write the default config to disk on `upsbeepd --write-default-config`.
 - Tests: round-trip, missing fields use defaults, invalid TOML gives a clear error.
 
-### 2. Beep gating in core
+### 2. Beep gating in core (done)
 - Add `BeepGate` in `upsbeep-core`: input is block results with timestamps, output is one beep event per tone burst (min burst duration, min gap).
 - Tests with synthetic block sequences: click rejected, long tone is one event, two bursts are two events.
 
-### 3. Shutdown abstraction
-- `Shutdown` trait plus Linux, Windows and DryRun implementations in `upsbeepd`.
+### 3. Shutdown abstraction (done)
+- Implemented as a single `power_off(dry_run)` function with cfg-gated command lists, not a trait.
 - Pick the real or dry-run implementation from `config.dry_run`.
 - Never run the real implementation in tests.
 
-### 4. Audio capture
+### 4. Audio capture (done)
 - Select the device by name or default; list devices with `--list-devices`.
 - Build the input stream, handle sample formats (f32, i16, u16), downmix to mono, forward blocks to the worker.
 - Handle stream errors: log, retry opening the device every 10 s (mic unplugged, suspend/resume).
 
-### 5. Main loop wiring
+### 5. Main loop wiring (done)
 - Worker: frame blocks, `tone_ratio`, `BeepGate`, `Detector::update`.
 - Also call `update(now, false)` on a 1 s tick so timeouts fire while silent.
 - On `Action::Shutdown`: log, call `Shutdown`, then exit.
 - Log state transitions (mains to battery, battery to mains) and a countdown to shutdown.
 
-### 6. Calibration helper (daemon side)
+### 6. Calibration helper (daemon side) (done)
 - `upsbeepd --analyze <seconds>`: record, then print the peak frequency, level, and detected beep timestamps and intervals.
 - This is how you find `tone_hz`, `threshold` and `beep_timeout_secs` for your UPS before trusting it. The UI will reuse the same logic later.
 

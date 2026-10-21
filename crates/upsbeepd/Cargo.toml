@@ -1,0 +1,8 @@
+[package]
+name = "upsbeepd"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+cpal = "0.18.2"
+upsbeep-core = { version = "0.1.0", path = "../upsbeep-core" }

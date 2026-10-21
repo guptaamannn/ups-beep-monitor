@@ -1,0 +1,8 @@
+[package]
+name = "upsbeep-ui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+eframe = "0.37.0"
+upsbeep-core = { version = "0.1.0", path = "../upsbeep-core" }

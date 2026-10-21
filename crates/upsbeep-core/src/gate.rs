@@ -12,6 +12,12 @@ pub struct BeepGate {
     fired: bool,
 }
 
+impl Default for BeepGate {
+    fn default() -> Self {
+        Self::new(Duration::from_millis(100), Duration::from_millis(200))
+    }
+}
+
 impl BeepGate {
     pub fn new(min_on: Duration, min_gap: Duration) -> Self {
         Self {

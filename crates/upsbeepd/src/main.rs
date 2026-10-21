@@ -1,5 +1,6 @@
 //! Headless daemon: listens to the mic, detects UPS beeps, shuts the PC down.
 
+mod analyze;
 mod audio;
 mod shutdown;
 
@@ -25,14 +26,22 @@ fn run() -> Result<(), String> {
     let mut args = std::env::args().skip(1);
     let mut path: Option<PathBuf> = None;
     let mut write_default = false;
+    let mut analyze_secs: Option<u64> = None;
     while let Some(a) = args.next() {
         match a.as_str() {
             "--config" => path = Some(args.next().ok_or("--config needs a path")?.into()),
             "--write-default-config" => write_default = true,
             "--list-devices" => return audio::list_devices(),
+            "--analyze" => {
+                let secs = args
+                    .next()
+                    .and_then(|s| s.parse().ok())
+                    .ok_or("--analyze needs seconds")?;
+                analyze_secs = Some(secs);
+            }
             "--help" | "-h" => {
                 println!(
-                    "usage: upsbeepd [--config PATH] [--list-devices] [--write-default-config]"
+                    "usage: upsbeepd [--config PATH] [--list-devices] [--analyze SECS] [--write-default-config]"
                 );
                 return Ok(());
             }
@@ -55,6 +64,9 @@ fn run() -> Result<(), String> {
         eprintln!("no config at {}, using defaults", path.display());
         Config::default()
     };
+    if let Some(secs) = analyze_secs {
+        return analyze::run(&cfg, secs);
+    }
     eprintln!(
         "tone {} Hz, threshold {}, dry_run {}",
         cfg.tone_hz, cfg.threshold, cfg.dry_run
@@ -67,7 +79,7 @@ fn monitor(cfg: &Config) -> Result<(), String> {
     let mut capture: Option<Capture> = None;
     let mut next_retry = Instant::now();
 
-    let mut gate = BeepGate::new(Duration::from_millis(100), Duration::from_millis(200));
+    let mut gate = BeepGate::default();
     let mut detector = Detector::new(
         Duration::from_secs(cfg.beep_timeout_secs),
         Duration::from_secs(cfg.shutdown_after_secs),

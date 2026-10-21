@@ -8,8 +8,6 @@ pub struct Config {
     pub tone_hz: f32,
     /// Goertzel power ratio (tone power / total power) above which a block counts as a beep.
     pub threshold: f32,
-    /// Capture sample rate in Hz.
-    pub sample_rate: u32,
     /// Seconds the beeps may be absent before the UPS is considered back on mains.
     pub beep_timeout_secs: u64,
     /// Seconds on battery before shutting down.
@@ -25,7 +23,6 @@ impl Default for Config {
         Self {
             tone_hz: 2800.0,
             threshold: 0.5,
-            sample_rate: 8000,
             beep_timeout_secs: 180,
             shutdown_after_secs: 300,
             device: None,
@@ -73,7 +70,11 @@ mod tests {
 
     #[test]
     fn round_trips() {
-        let cfg = Config { tone_hz: 3100.0, dry_run: false, ..Config::default() };
+        let cfg = Config {
+            tone_hz: 3100.0,
+            dry_run: false,
+            ..Config::default()
+        };
         let back = Config::from_toml(&cfg.to_toml()).unwrap();
         assert_eq!(back.tone_hz, 3100.0);
         assert!(!back.dry_run);
@@ -83,7 +84,7 @@ mod tests {
     fn missing_fields_use_defaults() {
         let cfg = Config::from_toml("tone_hz = 2000.0").unwrap();
         assert_eq!(cfg.tone_hz, 2000.0);
-        assert_eq!(cfg.sample_rate, Config::default().sample_rate);
+        assert_eq!(cfg.threshold, Config::default().threshold);
     }
 
     #[test]
@@ -96,7 +97,10 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("upsbeep-test-{}", std::process::id()));
         let path = dir.join("nested").join("config.toml");
         Config::default().save(&path).unwrap();
-        assert_eq!(Config::load(&path).unwrap().tone_hz, Config::default().tone_hz);
+        assert_eq!(
+            Config::load(&path).unwrap().tone_hz,
+            Config::default().tone_hz
+        );
         std::fs::remove_dir_all(dir).unwrap();
     }
 }

@@ -14,7 +14,13 @@ pub struct BeepGate {
 
 impl BeepGate {
     pub fn new(min_on: Duration, min_gap: Duration) -> Self {
-        Self { min_on, min_gap, run_start: None, last_active: None, fired: false }
+        Self {
+            min_on,
+            min_gap,
+            run_start: None,
+            last_active: None,
+            fired: false,
+        }
     }
 
     /// Returns `true` exactly once per beep, when it has lasted long enough.
@@ -26,12 +32,12 @@ impl BeepGate {
                 self.fired = true;
                 return true;
             }
-        } else if let Some(last) = self.last_active {
-            if now.duration_since(last) >= self.min_gap {
-                self.run_start = None;
-                self.last_active = None;
-                self.fired = false;
-            }
+        } else if let Some(last) = self.last_active
+            && now.duration_since(last) >= self.min_gap
+        {
+            self.run_start = None;
+            self.last_active = None;
+            self.fired = false;
         }
         false
     }
@@ -68,7 +74,10 @@ mod tests {
 
     #[test]
     fn two_bursts_fire_twice() {
-        assert_eq!(run(&mut gate(), Instant::now(), 0, "#####.........#####"), 2);
+        assert_eq!(
+            run(&mut gate(), Instant::now(), 0, "#####.........#####"),
+            2
+        );
     }
 
     #[test]

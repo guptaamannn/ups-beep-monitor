@@ -22,7 +22,12 @@ pub struct Detector {
 
 impl Detector {
     pub fn new(beep_timeout: Duration, shutdown_after: Duration) -> Self {
-        Self { beep_timeout, shutdown_after, state: State::Mains, last_beep: None }
+        Self {
+            beep_timeout,
+            shutdown_after,
+            state: State::Mains,
+            last_beep: None,
+        }
     }
 
     pub fn state(&self) -> State {
@@ -37,7 +42,9 @@ impl Detector {
             }
         }
         if let State::OnBattery { since } = self.state {
-            let quiet = self.last_beep.is_none_or(|t| now.duration_since(t) > self.beep_timeout);
+            let quiet = self
+                .last_beep
+                .is_none_or(|t| now.duration_since(t) > self.beep_timeout);
             if quiet {
                 self.state = State::Mains;
             } else if now.duration_since(since) >= self.shutdown_after {
@@ -58,7 +65,10 @@ mod tests {
         let mut d = Detector::new(Duration::from_secs(60), Duration::from_secs(120));
         assert_eq!(d.update(t0, true), Action::None);
         assert_eq!(d.update(t0 + Duration::from_secs(30), true), Action::None);
-        assert_eq!(d.update(t0 + Duration::from_secs(120), true), Action::Shutdown);
+        assert_eq!(
+            d.update(t0 + Duration::from_secs(120), true),
+            Action::Shutdown
+        );
     }
 
     #[test]

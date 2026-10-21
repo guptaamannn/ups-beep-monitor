@@ -61,7 +61,7 @@ Already done: `upsbeep-core` has `Config`, `goertzel::tone_ratio`, and the `Dete
 
 ## Risks and open questions
 
-- Does the PC have a microphone, or is a USB mic needed? This decides whether the tool is usable at all.
+- Does the PC have a microphone, or is a USB mic needed? This decides whether the tool is usable at all. -> Not yet, but I'll connect a microphone into one of the audio jack of the motherboard.
 - The beep pattern of your UPS model is unknown: tone, interval, and whether the pattern changes at low battery.
 - A system service may not have mic access on either OS, which affects milestone 7.
 - A suspended or hibernating PC cannot listen, so power settings may need changing.

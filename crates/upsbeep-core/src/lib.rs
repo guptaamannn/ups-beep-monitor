@@ -7,4 +7,5 @@ pub mod gate;
 pub mod goertzel;
 #[cfg(unix)]
 pub mod ipc;
+pub mod pipeline;
 pub mod watchdog;

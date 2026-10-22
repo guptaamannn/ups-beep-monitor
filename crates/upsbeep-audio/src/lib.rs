@@ -23,11 +23,21 @@ fn describe(device: &Device) -> String {
         .unwrap_or_else(|_| "unknown".into())
 }
 
-pub fn list_devices() -> Result<(), String> {
+/// Names of the available input devices, and which one is the default.
+pub fn device_names() -> Result<(Vec<String>, Option<String>), String> {
     let host = cpal::default_host();
     let default = host.default_input_device().map(|d| describe(&d));
-    for device in host.input_devices().map_err(|e| e.to_string())? {
-        let name = describe(&device);
+    let names = host
+        .input_devices()
+        .map_err(|e| e.to_string())?
+        .map(|d| describe(&d))
+        .collect();
+    Ok((names, default))
+}
+
+pub fn list_devices() -> Result<(), String> {
+    let (names, default) = device_names()?;
+    for name in names {
         let mark = if Some(&name) == default.as_ref() {
             " (default)"
         } else {

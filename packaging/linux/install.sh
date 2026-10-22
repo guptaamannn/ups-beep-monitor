@@ -8,7 +8,7 @@ bin_dir="$HOME/.local/bin"
 
 cargo build --release -p upsbeepd --manifest-path "$root/Cargo.toml"
 mkdir -p "$bin_dir" "$unit_dir"
-install -m 755 "$root/target/release/upsbeepd" "$bin_dir/upsbeepd"
+install -m 755 "$root/target/release/upsbeepd" "$root/target/release/upsbeepctl" "$bin_dir/"
 install -m 644 "$root/packaging/linux/upsbeepd.service" "$unit_dir/upsbeepd.service"
 
 # Create a default config (dry_run = true) only if none exists.

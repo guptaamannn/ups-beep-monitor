@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct Config {
     /// Beep tone frequency in Hz (find it with the UI calibration view).
     pub tone_hz: f32,
@@ -107,6 +107,11 @@ mod tests {
         let cfg = Config::from_toml("tone_hz = 2000.0").unwrap();
         assert_eq!(cfg.tone_hz, 2000.0);
         assert_eq!(cfg.threshold, Config::default().threshold);
+    }
+
+    #[test]
+    fn unknown_key_is_an_error() {
+        assert!(Config::from_toml("dry_runn = false").is_err());
     }
 
     #[test]

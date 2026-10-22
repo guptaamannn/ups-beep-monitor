@@ -1,0 +1,39 @@
+name: UPS compatibility report
+description: Tell us whether upsbeep works with your UPS
+labels: [ups-report]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: UPS make and model
+      placeholder: "Vendor Model 1234"
+    validations:
+      required: true
+  - type: input
+    id: tone
+    attributes:
+      label: Detected beep tone (Hz)
+      description: From the Calibrate tab or `upsbeepd --analyze`.
+    validations:
+      required: true
+  - type: textarea
+    id: pattern
+    attributes:
+      label: Beep pattern on battery
+      description: How long until it starts beeping, how many beeps, how often, and whether the pattern changes as the battery drains (low-battery alarm).
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Did detection work?
+      options:
+        - Yes, reliably
+        - Mostly, with some missed or false beeps
+        - No
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Microphone, distance, threshold used, anything else

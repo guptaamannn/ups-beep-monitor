@@ -2,6 +2,11 @@
 name = "upsbeepd"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Daemon that shuts the PC down when it hears its UPS beeping"
 
 [dependencies]
 upsbeep-audio = { version = "0.1.0", path = "../upsbeep-audio" }

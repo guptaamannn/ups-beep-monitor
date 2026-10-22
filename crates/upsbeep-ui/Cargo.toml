@@ -2,6 +2,11 @@
 name = "upsbeep-ui"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Calibration and settings window for upsbeep"
 
 [dependencies]
 eframe = "0.37.0"

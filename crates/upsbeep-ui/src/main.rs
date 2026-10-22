@@ -18,6 +18,10 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "UPS Beep Monitor",
         eframe::NativeOptions::default(),
-        Box::new(|_| Ok(Box::new(App { cfg: Config::default() }))),
+        Box::new(|_| {
+            Ok(Box::new(App {
+                cfg: Config::default(),
+            }))
+        }),
     )
 }

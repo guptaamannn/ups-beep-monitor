@@ -29,8 +29,8 @@ pub fn peak_frequency(
     Some(best)
 }
 
-/// Picks the most common frequency (rounded to `step`) among strongly tonal blocks.
-pub fn dominant_frequency(peaks: &[(f32, f32)], min_ratio: f32, step: f32) -> Option<f32> {
+/// Counts strongly tonal blocks per frequency (rounded to `step`), most common first.
+pub fn frequency_histogram(peaks: &[(f32, f32)], min_ratio: f32, step: f32) -> Vec<(f32, usize)> {
     let mut counts: Vec<(i64, usize)> = Vec::new();
     for &(f, r) in peaks {
         if r < min_ratio {
@@ -42,10 +42,18 @@ pub fn dominant_frequency(peaks: &[(f32, f32)], min_ratio: f32, step: f32) -> Op
             None => counts.push((bin, 1)),
         }
     }
+    counts.sort_by(|a, b| b.1.cmp(&a.1));
     counts
         .into_iter()
-        .max_by_key(|&(_, n)| n)
-        .map(|(b, _)| b as f32 * step)
+        .map(|(b, n)| (b as f32 * step, n))
+        .collect()
+}
+
+/// The most common frequency among strongly tonal blocks.
+pub fn dominant_frequency(peaks: &[(f32, f32)], min_ratio: f32, step: f32) -> Option<f32> {
+    frequency_histogram(peaks, min_ratio, step)
+        .first()
+        .map(|&(f, _)| f)
 }
 
 #[cfg(test)]

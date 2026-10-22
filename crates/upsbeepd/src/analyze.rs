@@ -3,7 +3,7 @@
 use crate::audio::{self, BLOCK, Msg};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
-use upsbeep_core::analyze::{dominant_frequency, peak_frequency};
+use upsbeep_core::analyze::{dominant_frequency, frequency_histogram, peak_frequency};
 use upsbeep_core::config::Config;
 use upsbeep_core::gate::BeepGate;
 use upsbeep_core::goertzel::tone_ratio;
@@ -40,6 +40,12 @@ pub fn run(cfg: &Config, secs: u64) -> Result<(), String> {
         return Ok(());
     };
     println!("dominant tone: about {freq} Hz");
+    let top: Vec<String> = frequency_histogram(&peaks, 0.5, STEP)
+        .iter()
+        .take(5)
+        .map(|(f, n)| format!("{f} Hz x{n}"))
+        .collect();
+    println!("top tones (blocks): {}", top.join(", "));
 
     // Replay the recording through the same gate the daemon uses.
     let mut gate = BeepGate::default();

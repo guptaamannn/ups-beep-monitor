@@ -1,0 +1,42 @@
+name: Bug report
+description: Something doesn't work, including false or missed beeps
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `upsbeepctl status`
+      render: text
+  - type: textarea
+    id: log
+    attributes:
+      label: Recent log
+      description: The relevant lines from `~/.local/state/upsbeep/events.log` or `journalctl --user -u upsbeepd`.
+      render: text
+  - type: textarea
+    id: config
+    attributes:
+      label: Config
+      description: Contents of `~/.config/upsbeep/config.toml`.
+      render: toml
+  - type: input
+    id: version
+    attributes:
+      label: Version and install method
+      placeholder: "0.1.0, .deb"
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: OS and audio setup
+      placeholder: "Ubuntu 26.04, GNOME/Wayland, PipeWire, USB microphone"
+    validations:
+      required: true

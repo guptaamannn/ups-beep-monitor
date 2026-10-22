@@ -19,6 +19,12 @@ install -m 755 "${bins[@]}" "$pkg/usr/bin/"
 sed "s|@BIN@|/usr/bin|" "$root/packaging/linux/upsbeepd.service.in" > "$pkg/usr/lib/systemd/user/upsbeepd.service"
 sed "s|@BIN@|/usr/bin|" "$root/packaging/linux/upsbeep.desktop.in" > "$pkg/usr/share/applications/upsbeep.desktop"
 install -m 644 "$root/README.md" "$pkg/usr/share/doc/upsbeep/README.md"
+install -m 644 "$root/CHANGELOG.md" "$root/LICENSE-MIT" "$root/LICENSE-APACHE" "$pkg/usr/share/doc/upsbeep/"
+cat > "$pkg/usr/share/doc/upsbeep/copyright" <<'COPYRIGHT'
+Copyright (c) 2026 guptaamannn
+License: MIT or Apache-2.0, at your option.
+The full texts are in LICENSE-MIT and LICENSE-APACHE in this directory.
+COPYRIGHT
 
 # Let dpkg work out the shared-library dependencies of the binaries.
 shl="$(mktemp -d)"

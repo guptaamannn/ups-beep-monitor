@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=UPS Beep Monitor
+Comment=Status, calibration and settings for the UPS beep monitor
+Exec=@BIN@/upsbeep-ui
+Icon=battery
+Terminal=false
+Categories=System;Monitor;

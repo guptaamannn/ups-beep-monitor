@@ -85,6 +85,7 @@ fn monitor(cfg: &Config) -> Result<(), String> {
         Duration::from_secs(cfg.shutdown_after_secs),
     );
     let mut was_on_battery = false;
+    let mut shutdown_done = false;
     let mut last_countdown = Instant::now();
 
     loop {
@@ -122,12 +123,14 @@ fn monitor(cfg: &Config) -> Result<(), String> {
         if beep {
             eprintln!("beep");
         }
-        if detector.update(now, beep) == Action::Shutdown {
+        if detector.update(now, beep) == Action::Shutdown && !shutdown_done {
             eprintln!("on battery for {}s, shutting down", cfg.shutdown_after_secs);
             shutdown::power_off(cfg.dry_run);
             if !cfg.dry_run {
                 return Ok(());
             }
+            // Dry run: report once per outage, not on every loop pass.
+            shutdown_done = true;
         }
 
         match detector.state() {
@@ -148,6 +151,7 @@ fn monitor(cfg: &Config) -> Result<(), String> {
                 if was_on_battery {
                     eprintln!("beeps stopped: back on mains");
                     was_on_battery = false;
+                    shutdown_done = false;
                 }
             }
         }

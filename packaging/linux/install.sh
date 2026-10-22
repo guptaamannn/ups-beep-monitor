@@ -17,6 +17,7 @@ cfg="${XDG_CONFIG_HOME:-$HOME/.config}/upsbeep/config.toml"
 [ -f "$cfg" ] || "$bin_dir/upsbeepd" --write-default-config
 
 systemctl --user daemon-reload
-systemctl --user enable --now upsbeepd.service
+systemctl --user enable upsbeepd.service
+systemctl --user restart upsbeepd.service
 echo "installed. logs: journalctl --user -u upsbeepd -f"
 echo "config: $cfg (dry_run is true until you change it, then: systemctl --user restart upsbeepd)"

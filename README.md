@@ -44,6 +44,16 @@ packaging/linux/uninstall.sh
 
 The service blocks system suspend while running (a sleeping PC cannot hear the UPS). Config lives at `~/.config/upsbeep/config.toml`; find your UPS's tone first with `upsbeepd --analyze 70` while it is beeping. Restart after editing: `systemctl --user restart upsbeepd`.
 
+## Window
+
+`upsbeep-ui` (also in the app menu as "UPS Beep Monitor") is an on-demand window; it uses no memory while closed.
+
+- **Status:** live daemon state with cancel / pause / resume buttons.
+- **Calibrate:** live level meter and tone spectrum with the configured tone and threshold marked. Make the UPS beep, press "Record and analyze", then "Use these values and save".
+- **Settings:** edit every config option and save; the daemon reloads the file automatically.
+
+The microphone is only opened while the Calibrate tab is showing.
+
 ## Control
 
 `upsbeepctl` talks to the running daemon over a socket in `$XDG_RUNTIME_DIR` (owner-only):

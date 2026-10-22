@@ -8,9 +8,11 @@ pub struct Config {
     pub tone_hz: f32,
     /// Goertzel power ratio (tone power / total power) above which a block counts as a beep.
     pub threshold: f32,
-    /// Seconds the beeps may be absent before the UPS is considered back on mains.
+    /// Seconds without a beep before the UPS is considered back on mains. Must exceed the
+    /// UPS beep interval (60 s on this UPS) with some margin for a missed beep.
     pub beep_timeout_secs: u64,
-    /// Seconds on battery before shutting down.
+    /// Seconds from the first beep before shutting down. The UPS only starts beeping about
+    /// 60 s after the outage begins, so the real outage is this plus ~60 s when shutdown fires.
     pub shutdown_after_secs: u64,
     /// Input device name; `None` uses the system default.
     pub device: Option<String>,
@@ -23,7 +25,7 @@ impl Default for Config {
         Self {
             tone_hz: 2800.0,
             threshold: 0.5,
-            beep_timeout_secs: 180,
+            beep_timeout_secs: 90,
             shutdown_after_secs: 300,
             device: None,
             dry_run: true,

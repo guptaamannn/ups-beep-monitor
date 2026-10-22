@@ -2,18 +2,24 @@
 
 mod analyze;
 mod audio;
+mod events;
 mod shutdown;
 
 use audio::{Capture, Msg};
-use std::path::PathBuf;
+use events::Events;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use upsbeep_core::config::{self, Config};
 use upsbeep_core::detector::{Action, Detector, State};
 use upsbeep_core::gate::BeepGate;
 use upsbeep_core::goertzel::tone_ratio;
+use upsbeep_core::watchdog::{MicEvent, MicWatchdog};
 
 const RETRY_EVERY: Duration = Duration::from_secs(10);
+const RELOAD_CHECK_EVERY: Duration = Duration::from_secs(2);
+const MIC_SILENT_AFTER: Duration = Duration::from_secs(600);
+const MIC_DOWN_AFTER: Duration = Duration::from_secs(60);
 
 fn main() {
     if let Err(e) = run() {
@@ -67,64 +73,128 @@ fn run() -> Result<(), String> {
     if let Some(secs) = analyze_secs {
         return analyze::run(&cfg, secs);
     }
-    eprintln!(
-        "tone {} Hz, threshold {}, dry_run {}",
+    Events::new(&cfg).info(&format!(
+        "started: tone {} Hz, threshold {}, dry_run {}",
         cfg.tone_hz, cfg.threshold, cfg.dry_run
-    );
-    monitor(&cfg)
+    ));
+    monitor(cfg, path)
 }
 
-fn monitor(cfg: &Config) -> Result<(), String> {
+fn mtime(path: &Path) -> Option<SystemTime> {
+    std::fs::metadata(path).and_then(|m| m.modified()).ok()
+}
+
+fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
     let (tx, rx) = mpsc::sync_channel::<Msg>(64);
     let mut capture: Option<Capture> = None;
     let mut next_retry = Instant::now();
 
+    let mut ev = Events::new(&cfg);
     let mut gate = BeepGate::default();
+    gate.set_timing(
+        Duration::from_millis(cfg.gate_min_on_ms),
+        Duration::from_millis(cfg.gate_min_gap_ms),
+    );
     let mut detector = Detector::new(
         Duration::from_secs(cfg.beep_timeout_secs),
         Duration::from_secs(cfg.shutdown_after_secs),
     );
+    let mut watchdog = MicWatchdog::new(MIC_SILENT_AFTER, MIC_DOWN_AFTER);
     let mut was_on_battery = false;
     let mut shutdown_done = false;
     let mut last_countdown = Instant::now();
+    let mut config_mtime = mtime(&path);
+    let mut next_reload_check = Instant::now() + RELOAD_CHECK_EVERY;
 
     loop {
-        if capture.is_none() && Instant::now() >= next_retry {
+        let now = Instant::now();
+
+        if now >= next_reload_check {
+            next_reload_check = now + RELOAD_CHECK_EVERY;
+            let latest = mtime(&path);
+            if latest.is_some() && latest != config_mtime {
+                config_mtime = latest;
+                match Config::load(&path) {
+                    Ok(new) => {
+                        if new.device != cfg.device {
+                            capture = None;
+                            next_retry = now;
+                        }
+                        gate.set_timing(
+                            Duration::from_millis(new.gate_min_on_ms),
+                            Duration::from_millis(new.gate_min_gap_ms),
+                        );
+                        detector.set_durations(
+                            Duration::from_secs(new.beep_timeout_secs),
+                            Duration::from_secs(new.shutdown_after_secs),
+                        );
+                        cfg = new;
+                        ev = Events::new(&cfg);
+                        ev.info(&format!(
+                            "config reloaded: tone {} Hz, threshold {}, dry_run {}",
+                            cfg.tone_hz, cfg.threshold, cfg.dry_run
+                        ));
+                    }
+                    Err(e) => ev.info(&format!("config reload failed, keeping old settings: {e}")),
+                }
+            }
+        }
+
+        if capture.is_none() && now >= next_retry {
             match audio::open(cfg.device.as_deref(), tx.clone()) {
                 Ok(c) => capture = Some(c),
                 Err(e) => {
-                    eprintln!(
+                    ev.info(&format!(
                         "cannot open audio input: {e}; retrying in {}s",
                         RETRY_EVERY.as_secs()
-                    );
-                    next_retry = Instant::now() + RETRY_EVERY;
+                    ));
+                    next_retry = now + RETRY_EVERY;
                 }
             }
         }
 
         let mut beep = false;
+        let mut mic_event = None;
         match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(Msg::Block(block)) => {
                 if let Some(c) = &capture {
                     let ratio = tone_ratio(&block, cfg.tone_hz, c.sample_rate as f32);
                     beep = gate.update(Instant::now(), ratio >= cfg.threshold);
+                    let peak = block.iter().fold(0.0f32, |m, x| m.max(x.abs()));
+                    mic_event = watchdog.block(Instant::now(), peak);
                 }
             }
             Ok(Msg::StreamError(e)) => {
-                eprintln!("audio stream error: {e}; reopening");
+                ev.info(&format!("audio stream error: {e}; reopening"));
                 capture = None;
                 next_retry = Instant::now() + RETRY_EVERY;
             }
             Err(RecvTimeoutError::Timeout) => {}
             Err(RecvTimeoutError::Disconnected) => return Err("audio channel closed".into()),
         }
+        if capture.is_none() {
+            mic_event = mic_event.or(watchdog.down(Instant::now()));
+        }
+        match mic_event {
+            Some(MicEvent::Silent) => ev.alert(
+                "microphone has been silent for 10 minutes (muted or unplugged?); the UPS is NOT being monitored",
+            ),
+            Some(MicEvent::Down) => ev.alert(
+                "no audio input available for 60 s; the UPS is NOT being monitored",
+            ),
+            Some(MicEvent::Recovered) => ev.alert("microphone is working again"),
+            None => {}
+        }
 
         let now = Instant::now();
         if beep {
-            eprintln!("beep");
+            ev.info("beep");
         }
         if detector.update(now, beep) == Action::Shutdown && !shutdown_done {
-            eprintln!("on battery for {}s, shutting down", cfg.shutdown_after_secs);
+            ev.alert(&format!(
+                "on battery for {}s, shutting down now",
+                cfg.shutdown_after_secs
+            ));
             shutdown::power_off(cfg.dry_run);
             if !cfg.dry_run {
                 return Ok(());
@@ -136,7 +206,10 @@ fn monitor(cfg: &Config) -> Result<(), String> {
         match detector.state() {
             State::OnBattery { since } => {
                 if !was_on_battery {
-                    eprintln!("UPS beeping: assuming power outage");
+                    ev.alert(&format!(
+                        "UPS is beeping: assuming a power outage; shutting down in {}s unless mains returns",
+                        cfg.shutdown_after_secs
+                    ));
                     was_on_battery = true;
                     last_countdown = now;
                 } else if !shutdown_done
@@ -145,13 +218,13 @@ fn monitor(cfg: &Config) -> Result<(), String> {
                     let left = cfg
                         .shutdown_after_secs
                         .saturating_sub(now.duration_since(since).as_secs());
-                    eprintln!("on battery, shutdown in {left}s");
+                    ev.info(&format!("on battery, shutdown in {left}s"));
                     last_countdown = now;
                 }
             }
             State::Mains => {
                 if was_on_battery {
-                    eprintln!("beeps stopped: back on mains");
+                    ev.alert("beeps stopped: back on mains, shutdown cancelled");
                     was_on_battery = false;
                     shutdown_done = false;
                 }

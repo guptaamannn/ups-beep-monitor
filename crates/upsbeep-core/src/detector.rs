@@ -30,6 +30,11 @@ impl Detector {
         }
     }
 
+    pub fn set_durations(&mut self, beep_timeout: Duration, shutdown_after: Duration) {
+        self.beep_timeout = beep_timeout;
+        self.shutdown_after = shutdown_after;
+    }
+
     pub fn state(&self) -> State {
         self.state
     }

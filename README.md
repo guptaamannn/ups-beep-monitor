@@ -34,6 +34,16 @@ sudo apt install pkg-config libasound2-dev libudev-dev libssl-dev \
 
 Windows needs Rust (MSVC toolchain) and Visual Studio Build Tools with the "Desktop development with C++" workload.
 
+## Install on Ubuntu
+
+```bash
+packaging/linux/install.sh      # builds, installs to ~/.local/bin, starts a systemd user service
+journalctl --user -u upsbeepd -f
+packaging/linux/uninstall.sh
+```
+
+The service blocks system suspend while running (a sleeping PC cannot hear the UPS). Config lives at `~/.config/upsbeep/config.toml`; find your UPS's tone first with `upsbeepd --analyze 70` while it is beeping. Restart after editing: `systemctl --user restart upsbeepd`.
+
 ## Status
 
-Early scaffold. Core logic and tests exist; the daemon capture loop, platform shutdown, config file handling and the UI are still TODO. `dry_run` defaults to `true`, so nothing powers off until it is disabled in the config.
+The daemon (capture, detection, shutdown, `--analyze`) and the Linux service work. The Windows startup entry and the UI are still TODO. `dry_run` defaults to `true`, so nothing powers off until it is disabled in the config.

@@ -139,7 +139,9 @@ fn monitor(cfg: &Config) -> Result<(), String> {
                     eprintln!("UPS beeping: assuming power outage");
                     was_on_battery = true;
                     last_countdown = now;
-                } else if now.duration_since(last_countdown) >= Duration::from_secs(30) {
+                } else if !shutdown_done
+                    && now.duration_since(last_countdown) >= Duration::from_secs(30)
+                {
                     let left = cfg
                         .shutdown_after_secs
                         .saturating_sub(now.duration_since(since).as_secs());

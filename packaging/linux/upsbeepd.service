@@ -1,0 +1,12 @@
+[Unit]
+Description=UPS beep monitor (shuts down the PC on a long power outage)
+After=pipewire.service
+
+[Service]
+# systemd-inhibit stops the PC suspending, since a sleeping PC can't hear the UPS.
+ExecStart=/usr/bin/systemd-inhibit --what=sleep --who=upsbeepd --why="Listening for UPS beeps" %h/.local/bin/upsbeepd
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

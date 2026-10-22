@@ -42,7 +42,7 @@ pub fn frequency_histogram(peaks: &[(f32, f32)], min_ratio: f32, step: f32) -> V
             None => counts.push((bin, 1)),
         }
     }
-    counts.sort_by(|a, b| b.1.cmp(&a.1));
+    counts.sort_by_key(|c| std::cmp::Reverse(c.1));
     counts
         .into_iter()
         .map(|(b, n)| (b as f32 * step, n))

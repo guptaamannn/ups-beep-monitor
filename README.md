@@ -44,6 +44,24 @@ packaging/linux/uninstall.sh
 
 The service blocks system suspend while running (a sleeping PC cannot hear the UPS). Config lives at `~/.config/upsbeep/config.toml`; find your UPS's tone first with `upsbeepd --analyze 70` while it is beeping. Restart after editing: `systemctl --user restart upsbeepd`.
 
+## Configuration
+
+`~/.config/upsbeep/config.toml` is re-read automatically within a couple of seconds of saving; a file with errors (including unknown keys) is rejected and the old settings stay active. Options:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `tone_hz` | 2800 | UPS beep frequency (find it with `--analyze`) |
+| `threshold` | 0.5 | Tone strength that counts as a beep |
+| `beep_timeout_secs` | 90 | Silence after which mains is assumed back; must exceed the UPS beep interval |
+| `shutdown_after_secs` | 300 | Seconds from the first beep to shutdown |
+| `gate_min_on_ms` / `gate_min_gap_ms` | 100 / 200 | Beep length filter |
+| `notify` | true | Desktop notifications (needs `notify-send`) |
+| `event_log` | true | Log to `~/.local/state/upsbeep/events.log` (rotates at 1 MB) |
+| `device` | system default | Input device name (substring match, see `--list-devices`) |
+| `dry_run` | true | Log instead of powering off |
+
+The daemon also warns (log and notification) if the microphone is silent for 10 minutes or unavailable for 1 minute, since that means the UPS is not being monitored.
+
 ## Status
 
 The daemon (capture, detection, shutdown, `--analyze`) and the Linux service work. The Windows startup entry and the UI are still TODO. `dry_run` defaults to `true`, so nothing powers off until it is disabled in the config.

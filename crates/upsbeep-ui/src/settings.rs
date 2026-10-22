@@ -88,8 +88,8 @@ impl SettingsPane {
                 ui.checkbox(&mut cfg.event_log, "");
                 ui.end_row();
 
-                ui.label("Real shutdown");
-                ui.checkbox(&mut cfg.dry_run, "dry run (only log, don't power off)");
+                ui.label("Dry run");
+                ui.checkbox(&mut cfg.dry_run, "only log, don't power off");
                 ui.end_row();
             });
         if !cfg.dry_run {

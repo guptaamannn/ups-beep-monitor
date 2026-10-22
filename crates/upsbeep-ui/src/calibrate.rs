@@ -247,8 +247,8 @@ impl CalibratePane {
         painter.rect_filled(rect, 2.0, Color32::from_gray(24));
 
         let plot = Rect::from_min_max(
-            Pos2::new(rect.left() + 4.0, rect.top() + 4.0),
-            Pos2::new(rect.right() - 4.0, rect.bottom() - 18.0),
+            Pos2::new(rect.left() + 18.0, rect.top() + 4.0),
+            Pos2::new(rect.right() - 18.0, rect.bottom() - 18.0),
         );
         let x_of = |hz: f32| plot.left() + (hz - LO) / (HI - LO) * plot.width();
         let y_of = |v: f32| plot.bottom() - v.clamp(0.0, 1.0) * plot.height();
@@ -277,7 +277,7 @@ impl CalibratePane {
             let x = x_of(cfg.tone_hz);
             painter.line_segment(
                 [Pos2::new(x, plot.top()), Pos2::new(x, plot.bottom())],
-                Stroke::new(1.0, Color32::from_rgb(220, 60, 50)),
+                Stroke::new(2.0, Color32::from_rgb(235, 70, 60)),
             );
         }
         for hz in (LO as u32..=HI as u32).step_by(500) {

@@ -14,6 +14,14 @@ pub struct Config {
     /// Seconds from the first beep before shutting down. The UPS only starts beeping about
     /// 60 s after the outage begins, so the real outage is this plus ~60 s when shutdown fires.
     pub shutdown_after_secs: u64,
+    /// Minimum tone length in milliseconds for a beep to count (rejects clicks).
+    pub gate_min_on_ms: u64,
+    /// Silence in milliseconds that ends a beep. Gaps shorter than this stay inside one beep.
+    pub gate_min_gap_ms: u64,
+    /// Show desktop notifications for outages and problems.
+    pub notify: bool,
+    /// Append events to the log file in the user state directory.
+    pub event_log: bool,
     /// Input device name; `None` uses the system default.
     pub device: Option<String>,
     /// Log what would happen instead of shutting down.
@@ -27,6 +35,10 @@ impl Default for Config {
             threshold: 0.5,
             beep_timeout_secs: 90,
             shutdown_after_secs: 300,
+            gate_min_on_ms: 100,
+            gate_min_gap_ms: 200,
+            notify: true,
+            event_log: true,
             device: None,
             dry_run: true,
         }
@@ -64,6 +76,14 @@ pub fn default_path() -> Option<PathBuf> {
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")));
     base.map(|b| b.join("upsbeep").join("config.toml"))
+}
+
+/// Per-user event log location, or `None` if the home directory is unknown.
+pub fn default_log_path() -> Option<PathBuf> {
+    let base = std::env::var_os("XDG_STATE_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/state")));
+    base.map(|b| b.join("upsbeep").join("events.log"))
 }
 
 #[cfg(test)]

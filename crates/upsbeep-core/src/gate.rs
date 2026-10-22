@@ -29,6 +29,11 @@ impl BeepGate {
         }
     }
 
+    pub fn set_timing(&mut self, min_on: Duration, min_gap: Duration) {
+        self.min_on = min_on;
+        self.min_gap = min_gap;
+    }
+
     /// Returns `true` exactly once per beep, when it has lasted long enough.
     pub fn update(&mut self, now: Instant, active: bool) -> bool {
         if active {

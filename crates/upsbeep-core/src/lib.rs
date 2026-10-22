@@ -5,3 +5,4 @@ pub mod config;
 pub mod detector;
 pub mod gate;
 pub mod goertzel;
+pub mod watchdog;

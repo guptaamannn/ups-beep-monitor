@@ -4,5 +4,5 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-cpal = "0.18.2"
+upsbeep-audio = { version = "0.1.0", path = "../upsbeep-audio" }
 upsbeep-core = { version = "0.1.0", path = "../upsbeep-core" }

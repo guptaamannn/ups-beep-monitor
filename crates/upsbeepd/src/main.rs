@@ -1,18 +1,17 @@
 //! Headless daemon: listens to the mic, detects UPS beeps, shuts the PC down.
 
 mod analyze;
-mod audio;
 mod control;
 mod events;
 mod shutdown;
 
-use audio::{Capture, Msg};
 use control::Cmd;
 use events::Events;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
+use upsbeep_audio::{self as audio, Capture, Msg};
 use upsbeep_core::config::{self, Config};
 use upsbeep_core::detector::{Action, Detector, State};
 use upsbeep_core::gate::BeepGate;

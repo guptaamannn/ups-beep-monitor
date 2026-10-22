@@ -1,8 +1,8 @@
 //! `--analyze`: record for a while and report the beep tone, level and timing.
 
-use crate::audio::{self, BLOCK, Msg};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use upsbeep_audio::{self as audio, BLOCK, Msg};
 use upsbeep_core::analyze::{dominant_frequency, frequency_histogram, peak_frequency};
 use upsbeep_core::config::Config;
 use upsbeep_core::gate::BeepGate;

@@ -86,6 +86,11 @@ pub fn default_log_path() -> Option<PathBuf> {
     base.map(|b| b.join("upsbeep").join("events.log"))
 }
 
+/// Control socket location (daemon and `upsbeepctl` must agree), or `None` without a runtime dir.
+pub fn socket_path() -> Option<PathBuf> {
+    std::env::var_os("XDG_RUNTIME_DIR").map(|d| PathBuf::from(d).join("upsbeep.sock"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

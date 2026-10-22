@@ -44,6 +44,19 @@ packaging/linux/uninstall.sh
 
 The service blocks system suspend while running (a sleeping PC cannot hear the UPS). Config lives at `~/.config/upsbeep/config.toml`; find your UPS's tone first with `upsbeepd --analyze 70` while it is beeping. Restart after editing: `systemctl --user restart upsbeepd`.
 
+## Control
+
+`upsbeepctl` talks to the running daemon over a socket in `$XDG_RUNTIME_DIR` (owner-only):
+
+```bash
+upsbeepctl status         # state, shutdown countdown, last beep, mic level, config in use
+upsbeepctl cancel         # don't shut down for the current outage (resets when mains returns)
+upsbeepctl pause 30       # maintenance mode: no shutdown for 30 minutes (default 30)
+upsbeepctl resume         # undo cancel or pause
+```
+
+A pause that expires during an outage lets the shutdown go ahead right away. Use `pause` before testing the UPS.
+
 ## Configuration
 
 `~/.config/upsbeep/config.toml` is re-read automatically within a couple of seconds of saving; a file with errors (including unknown keys) is rejected and the old settings stay active. Options:

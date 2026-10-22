@@ -2,13 +2,16 @@
 
 mod analyze;
 mod audio;
+mod control;
 mod events;
 mod shutdown;
 
 use audio::{Capture, Msg};
+use control::Cmd;
 use events::Events;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 use upsbeep_core::config::{self, Config};
 use upsbeep_core::detector::{Action, Detector, State};
@@ -19,6 +22,7 @@ use upsbeep_core::watchdog::{MicEvent, MicWatchdog};
 const RETRY_EVERY: Duration = Duration::from_secs(10);
 const RELOAD_CHECK_EVERY: Duration = Duration::from_secs(2);
 const MIC_SILENT_AFTER: Duration = Duration::from_secs(600);
+const STATUS_EVERY: Duration = Duration::from_secs(1);
 const MIC_DOWN_AFTER: Duration = Duration::from_secs(60);
 
 fn main() {
@@ -106,8 +110,55 @@ fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
     let mut config_mtime = mtime(&path);
     let mut next_reload_check = Instant::now() + RELOAD_CHECK_EVERY;
 
+    let status = Arc::new(Mutex::new(String::new()));
+    let ctl_rx = match config::socket_path() {
+        None => {
+            ev.info("control socket disabled: XDG_RUNTIME_DIR is not set");
+            None
+        }
+        Some(p) => match control::start(&p, status.clone()) {
+            Ok(rx) => Some(rx),
+            Err(e) => {
+                ev.info(&format!("control socket disabled: {e}"));
+                None
+            }
+        },
+    };
+    let mut paused_until: Option<Instant> = None;
+    let mut cancelled = false;
+    let mut suppress_logged = false;
+    let mut last_beep: Option<Instant> = None;
+    let mut last_peak = 0.0f32;
+    let mut next_status = Instant::now();
+
     loop {
         let now = Instant::now();
+
+        if let Some(rx) = &ctl_rx {
+            while let Ok(cmd) = rx.try_recv() {
+                match cmd {
+                    Cmd::Cancel => {
+                        cancelled = true;
+                        suppress_logged = false;
+                        ev.alert("shutdown cancelled for this outage (by upsbeepctl)");
+                    }
+                    Cmd::Pause(d) => {
+                        paused_until = Some(now + d);
+                        suppress_logged = false;
+                        ev.alert(&format!(
+                            "shutdown paused for {} min (by upsbeepctl)",
+                            d.as_secs() / 60
+                        ));
+                    }
+                    Cmd::Resume => {
+                        paused_until = None;
+                        cancelled = false;
+                        suppress_logged = false;
+                        ev.info("shutdown resumed (by upsbeepctl)");
+                    }
+                }
+            }
+        }
 
         if now >= next_reload_check {
             next_reload_check = now + RELOAD_CHECK_EVERY;
@@ -161,6 +212,7 @@ fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
                     let ratio = tone_ratio(&block, cfg.tone_hz, c.sample_rate as f32);
                     beep = gate.update(Instant::now(), ratio >= cfg.threshold);
                     let peak = block.iter().fold(0.0f32, |m, x| m.max(x.abs()));
+                    last_peak = peak;
                     mic_event = watchdog.block(Instant::now(), peak);
                 }
             }
@@ -189,18 +241,27 @@ fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
         let now = Instant::now();
         if beep {
             ev.info("beep");
+            last_beep = Some(now);
         }
+        let suppressed = cancelled || paused_until.is_some_and(|t| now < t);
         if detector.update(now, beep) == Action::Shutdown && !shutdown_done {
-            ev.alert(&format!(
-                "on battery for {}s, shutting down now",
-                cfg.shutdown_after_secs
-            ));
-            shutdown::power_off(cfg.dry_run);
-            if !cfg.dry_run {
-                return Ok(());
+            if suppressed {
+                if !suppress_logged {
+                    ev.alert("shutdown time reached but it is cancelled or paused; staying up");
+                    suppress_logged = true;
+                }
+            } else {
+                ev.alert(&format!(
+                    "on battery for {}s, shutting down now",
+                    cfg.shutdown_after_secs
+                ));
+                shutdown::power_off(cfg.dry_run);
+                if !cfg.dry_run {
+                    return Ok(());
+                }
+                // Dry run: report once per outage, not on every loop pass.
+                shutdown_done = true;
             }
-            // Dry run: report once per outage, not on every loop pass.
-            shutdown_done = true;
         }
 
         match detector.state() {
@@ -213,6 +274,7 @@ fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
                     was_on_battery = true;
                     last_countdown = now;
                 } else if !shutdown_done
+                    && !suppressed
                     && now.duration_since(last_countdown) >= Duration::from_secs(30)
                 {
                     let left = cfg
@@ -227,8 +289,84 @@ fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
                     ev.alert("beeps stopped: back on mains, shutdown cancelled");
                     was_on_battery = false;
                     shutdown_done = false;
+                    cancelled = false;
+                    suppress_logged = false;
                 }
             }
         }
+
+        if now >= next_status {
+            next_status = now + STATUS_EVERY;
+            let view = StatusView {
+                cfg: &cfg,
+                state: detector.state(),
+                now,
+                last_beep,
+                peak: last_peak,
+                mic_ok: capture.is_some(),
+                paused_until,
+                cancelled,
+                shutdown_done,
+            };
+            if let Ok(mut st) = status.lock() {
+                *st = view.render();
+            }
+        }
+    }
+}
+
+struct StatusView<'a> {
+    cfg: &'a Config,
+    state: State,
+    now: Instant,
+    last_beep: Option<Instant>,
+    peak: f32,
+    mic_ok: bool,
+    paused_until: Option<Instant>,
+    cancelled: bool,
+    shutdown_done: bool,
+}
+
+impl StatusView<'_> {
+    fn render(&self) -> String {
+        let cfg = self.cfg;
+        let (state, shutdown) = match self.state {
+            State::Mains => ("mains OK".to_string(), "none pending".to_string()),
+            State::OnBattery { since } => {
+                let elapsed = self.now.duration_since(since).as_secs();
+                let left = cfg.shutdown_after_secs.saturating_sub(elapsed);
+                let shutdown = if self.cancelled {
+                    "CANCELLED for this outage".to_string()
+                } else if let Some(t) = self.paused_until.filter(|t| self.now < *t) {
+                    let mins = (t - self.now).as_secs().div_ceil(60);
+                    format!("PAUSED for ~{mins} more min (would fire in {left}s)")
+                } else if self.shutdown_done {
+                    "dry-run: already reported".to_string()
+                } else {
+                    format!("in {left}s")
+                };
+                (format!("ON BATTERY (beeping for {elapsed}s)"), shutdown)
+            }
+        };
+        let beep = self.last_beep.map_or("never".to_string(), |t| {
+            format!("{}s ago", self.now.duration_since(t).as_secs())
+        });
+        let mic = if self.mic_ok {
+            format!("ok (peak {:.3})", self.peak)
+        } else {
+            "NOT RECEIVING AUDIO: the UPS is not being monitored".to_string()
+        };
+        let paused = match self.paused_until.filter(|t| self.now < *t) {
+            Some(t) => format!("paused ~{} more min", (t - self.now).as_secs().div_ceil(60)),
+            None => "active".to_string(),
+        };
+        format!(
+            "state:    {state}\nshutdown: {shutdown}\nlast beep: {beep}\nmic:      {mic}\nmonitor:  {paused}, {}\nconfig:   tone {} Hz, threshold {}, mains-back after {}s silence, shutdown {}s after first beep\n",
+            if cfg.dry_run { "dry-run" } else { "LIVE" },
+            cfg.tone_hz,
+            cfg.threshold,
+            cfg.beep_timeout_secs,
+            cfg.shutdown_after_secs
+        )
     }
 }

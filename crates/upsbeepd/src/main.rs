@@ -13,9 +13,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 use upsbeep_audio::{self as audio, Capture, Msg};
 use upsbeep_core::config::{self, Config};
-use upsbeep_core::detector::{Action, Detector, State};
-use upsbeep_core::gate::BeepGate;
-use upsbeep_core::goertzel::tone_ratio;
+use upsbeep_core::detector::{Action, State};
+use upsbeep_core::pipeline::Pipeline;
 use upsbeep_core::watchdog::{MicEvent, MicWatchdog};
 
 const RETRY_EVERY: Duration = Duration::from_secs(10);
@@ -93,15 +92,7 @@ fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
     let mut next_retry = Instant::now();
 
     let mut ev = Events::new(&cfg);
-    let mut gate = BeepGate::default();
-    gate.set_timing(
-        Duration::from_millis(cfg.gate_min_on_ms),
-        Duration::from_millis(cfg.gate_min_gap_ms),
-    );
-    let mut detector = Detector::new(
-        Duration::from_secs(cfg.beep_timeout_secs),
-        Duration::from_secs(cfg.shutdown_after_secs),
-    );
+    let mut pipeline = Pipeline::new(&cfg);
     let mut watchdog = MicWatchdog::new(MIC_SILENT_AFTER, MIC_DOWN_AFTER);
     let mut was_on_battery = false;
     let mut shutdown_done = false;
@@ -170,14 +161,7 @@ fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
                             capture = None;
                             next_retry = now;
                         }
-                        gate.set_timing(
-                            Duration::from_millis(new.gate_min_on_ms),
-                            Duration::from_millis(new.gate_min_gap_ms),
-                        );
-                        detector.set_durations(
-                            Duration::from_secs(new.beep_timeout_secs),
-                            Duration::from_secs(new.shutdown_after_secs),
-                        );
+                        pipeline.reconfigure(&new);
                         cfg = new;
                         ev = Events::new(&cfg);
                         ev.info(&format!(
@@ -203,13 +187,12 @@ fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
             }
         }
 
-        let mut beep = false;
+        let mut step = None;
         let mut mic_event = None;
         match rx.recv_timeout(Duration::from_secs(1)) {
             Ok(Msg::Block(block)) => {
                 if let Some(c) = &capture {
-                    let ratio = tone_ratio(&block, cfg.tone_hz, c.sample_rate as f32);
-                    beep = gate.update(Instant::now(), ratio >= cfg.threshold);
+                    step = Some(pipeline.block(Instant::now(), &block, c.sample_rate as f32));
                     let peak = block.iter().fold(0.0f32, |m, x| m.max(x.abs()));
                     last_peak = peak;
                     mic_event = watchdog.block(Instant::now(), peak);
@@ -238,12 +221,13 @@ fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
         }
 
         let now = Instant::now();
-        if beep {
+        let step = step.unwrap_or_else(|| pipeline.tick(now));
+        if step.beep {
             ev.info("beep");
             last_beep = Some(now);
         }
         let suppressed = cancelled || paused_until.is_some_and(|t| now < t);
-        if detector.update(now, beep) == Action::Shutdown && !shutdown_done {
+        if step.action == Action::Shutdown && !shutdown_done {
             if suppressed {
                 if !suppress_logged {
                     ev.alert("shutdown time reached but it is cancelled or paused; staying up");
@@ -263,7 +247,7 @@ fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
             }
         }
 
-        match detector.state() {
+        match pipeline.state() {
             State::OnBattery { since } => {
                 if !was_on_battery {
                     ev.alert(&format!(
@@ -298,7 +282,7 @@ fn monitor(mut cfg: Config, path: PathBuf) -> Result<(), String> {
             next_status = now + STATUS_EVERY;
             let view = StatusView {
                 cfg: &cfg,
-                state: detector.state(),
+                state: pipeline.state(),
                 now,
                 last_beep,
                 peak: last_peak,

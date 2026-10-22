@@ -36,6 +36,16 @@ Windows needs Rust (MSVC toolchain) and Visual Studio Build Tools with the "Desk
 
 ## Install on Ubuntu
 
+From a `.deb` (build it with `packaging/linux/build-deb.sh`, or download one from a GitHub release):
+
+```bash
+sudo apt install ./upsbeep_*.deb
+systemctl --user enable --now upsbeepd   # as your own user; stays in dry-run until you turn it off
+upsbeep-ui                               # calibrate and edit settings
+```
+
+Or build from source into your home directory:
+
 ```bash
 packaging/linux/install.sh      # builds, installs to ~/.local/bin, starts a systemd user service
 journalctl --user -u upsbeepd -f
@@ -87,4 +97,4 @@ The daemon also warns (log and notification) if the microphone is silent for 10 
 
 ## Status
 
-The daemon (capture, detection, shutdown, `--analyze`) and the Linux service work. The Windows startup entry and the UI are still TODO. `dry_run` defaults to `true`, so nothing powers off until it is disabled in the config.
+The Linux tool is complete: daemon, service, `upsbeepctl`, the window, and a `.deb`. Windows support is not started. `dry_run` defaults to `true`, so nothing powers off until it is disabled in the config.
